@@ -1,9 +1,22 @@
+
+"""
+hex-bytes, strings, api-name, integer values
+TODO
+ - function rename 
+ - add comments 
+ - yara rule error handling 
+ - load search
+ - create report 
+"""
+
+
 import idautils
 import yara
 import operator
 import itertools
-
-# TODO  Create auto generated rules based off of single function
+import inspect
+import os 
+import sys 
 
 SEARCH_CASE = 4
 SEARCH_REGEX = 8
@@ -12,7 +25,6 @@ SEARCH_NOSHOW = 32
 SEARCH_UNICODE = 64
 SEARCH_IDENT = 128
 SEARCH_BRK = 256
-
 
 class YaraIDASearch:
     def __init__(self):
@@ -214,7 +226,7 @@ def generate_skeleton(ea):
             skeleton.add("%s" % x[1])
         for x in get_func_values(ea):
             skeleton.add(int(x[1]))
-        print skeleton
+    return list(skeleton)
 
 
 def get_xrefsto(ea):
@@ -317,10 +329,22 @@ def search_value(value_list, dict_match):
 
 yara_search = YaraIDASearch()
 
-
 def search(*search_terms):
     dict_match = {}
     value_list = []
+    # remove non-search attributes for renaming or commenting matches
+    comment = False
+    rename_func = False
+    temp_comment = [x for x in search_terms if "comment=" in x ]
+    temp_rename = [x for x in search_terms if "rename=" in x ]
+    if temp_comment:
+    	search_terms = [x for x in search_terms if x != temp_comment[0]]
+    if temp_rename:
+    	search_terms = [x for x in search_terms if x != temp_rename[0] ]
+    # start search 
+    status = False 
+    print
+    print search_terms
     for term in search_terms:
         if isinstance(term, str):
             if term.startswith("{"):
@@ -352,8 +376,8 @@ def search(*search_terms):
             value_list.append(term)
     if value_list:
         status, temp_match = search_value(value_list, dict_match)
-    if status:
-        dict_match = temp_match
+        if status:
+            dict_match = temp_match
     if dict_match:
         if len(dict_match.keys()) == len(search_terms):
             func_list = [set(dict_match[key]) for key in dict_match.keys()]
@@ -376,12 +400,34 @@ def comm_func(query, name):
     for func in func_set:
         idc.MakeRptCmt(func, name)
 
+
 def load_search(path):
-    with open(path, "rb") as infile:
-        return infile.readlines()
+	rule_path = get_rules_dir()
+
+
+def save_search(*search_terms):
+	temp_rule = [x for x in search_terms if "file_name=" in x ]
+	rule_path = get_rules_dir()
+	if temp_rule:
+		file_name = temp_rule[0].replace("file_name=", "")
+		temp_name = os.path.join(rule_path, file_name)
+		rules = [x for x in search_terms if x != temp_rule[0]]
+		print rules
+		print temp_rule
+		if os.path.exists(temp_name):
+			with open(str(temp_name), "a+") as f_h:
+				f_h.write(str(rules))
+				f_h.write("\n")
+		else:
+			with open(temp_name, "w") as f_h:
+				f_h.write(str(rules))
+				f_h.write("\n")
+	else:
+		print "ERROR: Must supply argument with file name `file_name=FOO.rule`"
+
+
+def get_rules_dir():
+	return os.path.join(os.path.dirname(inspect.getfile(inspect.currentframe())), "rules")
 
 
 
-"""
-hex-bytes, strings, api-name, integer values
-"""
