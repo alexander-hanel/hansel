@@ -7,16 +7,22 @@ TODO
  - yara rule error handling 
  - load search
  - create report 
+ - contex field?
+
+search attributes "file_name=", "comment=", "rename=", "name="
 """
 
 
 import idautils
+import datetime
+import glob 
 import yara
 import operator
 import itertools
 import inspect
 import os 
 import sys 
+import json 
 
 SEARCH_CASE = 4
 SEARCH_REGEX = 8
@@ -25,6 +31,9 @@ SEARCH_NOSHOW = 32
 SEARCH_UNICODE = 64
 SEARCH_IDENT = 128
 SEARCH_BRK = 256
+
+RULES_DIR = ""
+
 
 class YaraIDASearch:
     def __init__(self):
@@ -323,10 +332,6 @@ def search_value(value_list, dict_match):
         return True, dict_match
     return False, None
 
-
-# TODO how to deal with unicode strings?
-#   - check if string is unicode then add flag? boom!
-
 yara_search = YaraIDASearch()
 
 def search(*search_terms):
@@ -335,16 +340,26 @@ def search(*search_terms):
     # remove non-search attributes for renaming or commenting matches
     comment = False
     rename_func = False
+    context = False
+    file_name = False 
+    print "XXX", search_terms, type(search_terms)
     temp_comment = [x for x in search_terms if "comment=" in x ]
     temp_rename = [x for x in search_terms if "rename=" in x ]
+    temp_context =  [x for x in search_terms if "context=" in x ]
+    temp_file =  [x for x in search_terms if "file_name=" in x ]
     if temp_comment:
-    	search_terms = [x for x in search_terms if x != temp_comment[0]]
+        search_terms = [x for x in search_terms if x != temp_comment[0]]
+        temp_comment = temp_comment[0].replace("comment=", "")
     if temp_rename:
-    	search_terms = [x for x in search_terms if x != temp_rename[0] ]
+        search_terms = [x for x in search_terms if x != temp_rename[0]]
+        temp_rename = temp_rename[0].replace("rename=", "")
+    if temp_context:
+        search_terms = [x for x in search_terms if x != temp_context[0]]
+    if temp_file:
+        search_terms = [x for x in search_terms if x != temp_file[0]]
     # start search 
     status = False 
-    print
-    print search_terms
+    print "YYY", search_terms, type(search_terms)
     for term in search_terms:
         if isinstance(term, str):
             if term.startswith("{"):
@@ -382,27 +397,43 @@ def search(*search_terms):
         if len(dict_match.keys()) == len(search_terms):
             func_list = [set(dict_match[key]) for key in dict_match.keys()]
             if len(search_terms) == 1:
+            	label_(func_match, temp_comment, temp_rename)
                 return True, func_list[0]
             func_match = set.intersection(*func_list)
+            label_(func_match, temp_comment, temp_rename)
             return True, func_match
     return False, None
 
 
-def name_func(query, name):
-    status, func_set = query
-    for count, func in enumerate(func_set):
-        temp_name = "%s_%s" % (name, count)
-        idc.set_name(func, temp_name, SN_CHECK)
+def label_(func_match, temp_comment, temp_rename):
+    for match in func_match:
+    	if temp_comment:
+    		comm_func(match, temp_comment)
+    	if temp_rename:
+    		name_func(match, temp_rename) 
 
 
-def comm_func(query, name):
-    status, func_set = query
-    for func in func_set:
-        idc.MakeRptCmt(func, name)
+def name_func(ea, name):
+    f = idc.get_full_flags(ea)
+    if not idc.hasUserName(f):
+        idc.set_name(ea, name, SN_CHECK)
+    else:
+    	temp = idc.get_name(ea)
+    	if name in temp:
+           return 
+        temp_name = temp + "_" + name
+        idc.set_name(ea, temp_name, SN_CHECK)
 
 
-def load_search(path):
-	rule_path = get_rules_dir()
+def comm_func(ea, comment):
+    temp = idc.get_func_cmt(ea, True)
+    if comment in temp:
+        return 
+    if temp:
+        tt = temp + " " + comment
+        idc.set_func_cmt(ea, tt, True)
+    else:
+		idc.set_func_cmt(ea, comment, True)
 
 
 def save_search(*search_terms):
@@ -412,22 +443,67 @@ def save_search(*search_terms):
 		file_name = temp_rule[0].replace("file_name=", "")
 		temp_name = os.path.join(rule_path, file_name)
 		rules = [x for x in search_terms if x != temp_rule[0]]
-		print rules
-		print temp_rule
+		formated_rules = str(rules)[1:-1]
 		if os.path.exists(temp_name):
 			with open(str(temp_name), "a+") as f_h:
-				f_h.write(str(rules))
+				f_h.write(json.dumps(formated_rules))
 				f_h.write("\n")
 		else:
 			with open(temp_name, "w") as f_h:
-				f_h.write(str(rules))
+				f_h.write(json.dump(formated_rules))
 				f_h.write("\n")
 	else:
 		print "ERROR: Must supply argument with file name `file_name=FOO.rule`"
 
 
+def hotkey_rule():
+	ea = here()
+	skeleton = generate_skeleton(ea)
+	function_addr = "0x%x" % (get_func_addr(ea)[1])
+	context = "context=%s, %s" % (idc.get_idb_path(), function_addr)
+	skeleton.append(context)
+	rule_path = get_rules_dir()
+	temp_name = str(datetime.datetime.now().strftime("%Y-%m-%d")) + ".rule" 
+	file_path = os.path.join(rule_path, temp_name)
+	if os.path.exists(file_path):
+		with open(str(file_path), "a+") as f_h:
+			f_h.write(json.dumps(skeleton))
+			f_h.write("\n")
+	else:
+		with open(file_path, "w") as f_h:
+			f_h.write(json.dumps(skeleton))
+			f_h.write("\n")
+
+
 def get_rules_dir():
-	return os.path.join(os.path.dirname(inspect.getfile(inspect.currentframe())), "rules")
+	if RULES_DIR:
+		return RULES_DIR
+	else:
+		return os.path.join(os.path.dirname(inspect.getfile(inspect.currentframe())), "rules")
 
 
+def run_rules():
+	# TODO Need to figure out how to store the rules
+    rule_path = get_rules_dir()
+    print rule_path
+    paths = glob.glob(rule_path + "\*") 
+    for path in paths:
+    	if os.path.isdir(path):
+    		continue 
+        print "RULE: %s" % path
+        with open(path, "r") as rule:
+            for line_search in rule.readlines():
+                try:
+                    rule = json.loads(line_search)
+                    search(rule)
+                except:
+                    print "ERROR: Review file %s rule %s" % (path,line_search.rstrip() )
+
+def run_rule(rule_name):
+	rule_path = get_rules_dir()
+
+
+
+def format_search(*search_terms):
+	status, func_match = search(search_terms)
 
