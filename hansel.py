@@ -89,8 +89,9 @@ class YaraIDASearch:
                 pass
             else:
                 signature += " nocase"
-            if SEARCH_UNICODE & sflag:
-                signature += " wide"
+            # removed logic to check for ascii or wide, might as well do both. 
+            #if SEARCH_UNICODE & sflag:
+            signature += " wide ascii"
         yara_rule = "rule foo : bar { strings: $a = %s condition: $a }" % signature
         return yara_rule
 
@@ -268,7 +269,10 @@ def get_xrefsto(ea):
     :param ea:
     :return:
     """
-    return [x.frm for x in idautils.XrefsTo(ea, 1)]
+    if ea:
+        return [x.frm for x in idautils.XrefsTo(ea, 1)]
+    else:
+        return [] 
 
 
 def get_func_addr(ea):
@@ -297,7 +301,7 @@ def get_func_addr_end(ea):
 
 def func_xref_api_search(offset_list, api_list):
     """
-
+    hmm apparently this isn't needed 
     :param offset_list:
     :param api_list:
     :return:
@@ -403,6 +407,7 @@ def search(*search_terms):
     rename_func = False
     context = False
     file_name = False
+    # TODO - check that type is string and not int
     temp_comment = [x for x in search_terms if "comment=" in x]
     temp_rename = [x for x in search_terms if "rename=" in x]
     temp_context = [x for x in search_terms if "context=" in x]
@@ -421,6 +426,7 @@ def search(*search_terms):
     status = False
     for term in search_terms:
         if isinstance(term, str):
+            # start yara search 
             if term.startswith("{"):
                 status, yara_results = search_binary(term)
                 if not status:
@@ -435,6 +441,7 @@ def search(*search_terms):
                                 dict_match[term].append(offset)
 
             else:
+                # start string search 
                 status, string_results = search_string(term)
                 if not status:
                     return False, None
@@ -448,10 +455,12 @@ def search(*search_terms):
                                 dict_match[term].append(offset)
         elif isinstance(term, int):
             value_list.append(term)
+    # start integer search 
     if value_list:
         status, temp_match = search_value(value_list, dict_match)
         if status:
             dict_match = temp_match
+    # cross-reference matches to a single function 
     if dict_match:
         if len(dict_match.keys()) == len(search_terms):
             func_list = [set(dict_match[key]) for key in dict_match.keys()]
@@ -532,7 +541,7 @@ def save_search(*search_terms):
                 f_h.write("\n")
         else:
             with open(temp_name, "w") as f_h:
-                f_h.write(json.dump(rules))
+                f_h.write(json.dumps(rules))
                 f_h.write("\n")
     else:
         print "ERROR: Must supply argument with file name `file_name=FOO.rule`"
@@ -619,7 +628,7 @@ def run_rule(rule_name):
                         for m in match:
                             print "\tMatch at 0x%x" % m
                 except Exception as e:
-                    print "ERROR: Review file %s rule %s, %s" % (path, line_search.rstrip(), e)
+                    print "ERROR: Review file %s rule %s, %s" % (rule_path, line_search.rstrip(), e)
 
     else:
         print "ERROR: File %s could not be found"
