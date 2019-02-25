@@ -1,4 +1,3 @@
-
 """
 hex-bytes, strings, api-name, integer values
 TODO
@@ -12,17 +11,16 @@ TODO
 search attributes "file_name=", "comment=", "rename=", "name="
 """
 
-
 import idautils
 import datetime
-import glob 
+import glob
 import yara
 import operator
 import itertools
 import inspect
-import os 
-import sys 
-import json 
+import os
+import sys
+import json
 
 SEARCH_CASE = 4
 SEARCH_REGEX = 8
@@ -137,6 +135,11 @@ class YaraIDASearch:
 
 
 def is_lib(ea):
+    """
+
+    :param ea:
+    :return:
+    """
     flags = idc.get_func_attr(ea, FUNCATTR_FLAGS)
     if flags & FUNC_LIB:
         return True
@@ -145,6 +148,11 @@ def is_lib(ea):
 
 
 def get_func_symbols(ea):
+    """
+
+    :param ea:
+    :return:
+    """
     offsets = []
     dism_addr = list(idautils.FuncItems(ea))
     for addr in dism_addr:
@@ -174,6 +182,11 @@ def get_func_symbols(ea):
 
 
 def get_func_str_hack(ea):
+    """
+
+    :param ea:
+    :return:
+    """
     offsets = []
     status, ea_st = get_func_addr(ea)
     if status:
@@ -190,6 +203,11 @@ def get_func_str_hack(ea):
 
 
 def get_func_strings(ea):
+    """
+
+    :param ea:
+    :return:
+    """
     offsets = []
     dism_addr = list(idautils.FuncItems(ea))
     for addr in dism_addr:
@@ -208,10 +226,15 @@ def get_func_strings(ea):
 
 
 def get_func_values(ea):
+    """
+
+    :param ea:
+    :return:
+    """
     offsets = []
     dism_addr = list(idautils.FuncItems(ea))
     for addr in dism_addr:
-        length = idaapi.decode_insn(addr)
+        idaapi.decode_insn(addr)
         for c, v in enumerate(idaapi.cmd.Operands):
             if v.type == idaapi.o_void:
                 break
@@ -226,6 +249,11 @@ def get_func_values(ea):
 
 
 def generate_skeleton(ea):
+    """
+
+    :param ea:
+    :return:
+    """
     skeleton = set([])
     status, ea = get_func_addr(ea)
     if status:
@@ -239,11 +267,20 @@ def generate_skeleton(ea):
 
 
 def get_xrefsto(ea):
-    # TODO
+    """
+    TODO
+    :param ea:
+    :return:
+    """
     return [x.frm for x in idautils.XrefsTo(ea, 1)]
 
 
 def get_func_addr(ea):
+    """
+
+    :param ea:
+    :return:
+    """
     tt = idaapi.get_func(ea)
     if tt:
         return True, tt.startEA
@@ -251,6 +288,11 @@ def get_func_addr(ea):
 
 
 def get_func_addr_end(ea):
+    """
+
+    :param ea:
+    :return:
+    """
     tt = idaapi.get_func(ea)
     if tt:
         return True, tt.end_ea
@@ -258,6 +300,12 @@ def get_func_addr_end(ea):
 
 
 def func_xref_api_search(offset_list, api_list):
+    """
+
+    :param offset_list:
+    :param api_list:
+    :return:
+    """
     matches = []
     for offset in offset_list:
         xref_offset = get_xrefsto(offset)
@@ -270,7 +318,9 @@ def func_xref_api_search(offset_list, api_list):
 
 
 def search_binary(query):
-    """search using yara patterns"""
+    """
+    search using yara patterns
+    """
     global yara_search
     match = yara_search.find_binary(query)
     if match:
@@ -287,7 +337,11 @@ def search_binary(query):
 
 
 def search_string(query):
-    """search string, check if Name or string is present"""
+    """
+    search string, check if Name or string is present
+    :param query:
+    :return:
+    """
     global yara_search
     name_offset = idc.get_name_ea_simple(query)
     if name_offset != BADADDR:
@@ -307,8 +361,11 @@ def search_string(query):
 
 
 def search_value(value_list, dict_match):
-    """search if value exists in function
-    returns str of list
+    """
+    search if value exists in function returns str of list
+    :param value_list:
+    :param dict_match:
+    :return:
     """
     func_addr = []
     if dict_match:
@@ -332,21 +389,27 @@ def search_value(value_list, dict_match):
         return True, dict_match
     return False, None
 
+
 yara_search = YaraIDASearch()
 
+
 def search(*search_terms):
+    """
+
+    :param search_terms:
+    :return:
+    """
     dict_match = {}
     value_list = []
     # remove non-search attributes for renaming or commenting matches
     comment = False
     rename_func = False
     context = False
-    file_name = False 
-    print "XXX", search_terms, type(search_terms)
-    temp_comment = [x for x in search_terms if "comment=" in x ]
-    temp_rename = [x for x in search_terms if "rename=" in x ]
-    temp_context =  [x for x in search_terms if "context=" in x ]
-    temp_file =  [x for x in search_terms if "file_name=" in x ]
+    file_name = False
+    temp_comment = [x for x in search_terms if "comment=" in x]
+    temp_rename = [x for x in search_terms if "rename=" in x]
+    temp_context = [x for x in search_terms if "context=" in x]
+    temp_file = [x for x in search_terms if "file_name=" in x]
     if temp_comment:
         search_terms = [x for x in search_terms if x != temp_comment[0]]
         temp_comment = temp_comment[0].replace("comment=", "")
@@ -358,8 +421,7 @@ def search(*search_terms):
     if temp_file:
         search_terms = [x for x in search_terms if x != temp_file[0]]
     # start search 
-    status = False 
-    print "YYY", search_terms, type(search_terms)
+    status = False
     for term in search_terms:
         if isinstance(term, str):
             if term.startswith("{"):
@@ -397,7 +459,7 @@ def search(*search_terms):
         if len(dict_match.keys()) == len(search_terms):
             func_list = [set(dict_match[key]) for key in dict_match.keys()]
             if len(search_terms) == 1:
-            	label_(func_match, temp_comment, temp_rename)
+                label_(func_match, temp_comment, temp_rename)
                 return True, func_list[0]
             func_match = set.intersection(*func_list)
             label_(func_match, temp_comment, temp_rename)
@@ -406,104 +468,182 @@ def search(*search_terms):
 
 
 def label_(func_match, temp_comment, temp_rename):
+    """
+
+    :param func_match:
+    :param temp_comment:
+    :param temp_rename:
+    :return:
+    """
     for match in func_match:
-    	if temp_comment:
-    		comm_func(match, temp_comment)
-    	if temp_rename:
-    		name_func(match, temp_rename) 
+        if temp_comment:
+            comm_func(match, temp_comment)
+        if temp_rename:
+            name_func(match, temp_rename)
 
 
 def name_func(ea, name):
+    """
+
+    :param ea:
+    :param name:
+    :return:
+    """
     f = idc.get_full_flags(ea)
     if not idc.hasUserName(f):
         idc.set_name(ea, name, SN_CHECK)
     else:
-    	temp = idc.get_name(ea)
-    	if name in temp:
-           return 
+        temp = idc.get_name(ea)
+        if name in temp:
+            return
         temp_name = temp + "_" + name
         idc.set_name(ea, temp_name, SN_CHECK)
 
 
 def comm_func(ea, comment):
+    """
+
+    :param ea:
+    :param comment:
+    :return:
+    """
     temp = idc.get_func_cmt(ea, True)
     if comment in temp:
-        return 
+        return
     if temp:
         tt = temp + " " + comment
         idc.set_func_cmt(ea, tt, True)
     else:
-		idc.set_func_cmt(ea, comment, True)
+        idc.set_func_cmt(ea, comment, True)
 
 
 def save_search(*search_terms):
-	temp_rule = [x for x in search_terms if "file_name=" in x ]
-	rule_path = get_rules_dir()
-	if temp_rule:
-		file_name = temp_rule[0].replace("file_name=", "")
-		temp_name = os.path.join(rule_path, file_name)
-		rules = [x for x in search_terms if x != temp_rule[0]]
-		formated_rules = str(rules)[1:-1]
-		if os.path.exists(temp_name):
-			with open(str(temp_name), "a+") as f_h:
-				f_h.write(json.dumps(formated_rules))
-				f_h.write("\n")
-		else:
-			with open(temp_name, "w") as f_h:
-				f_h.write(json.dump(formated_rules))
-				f_h.write("\n")
-	else:
-		print "ERROR: Must supply argument with file name `file_name=FOO.rule`"
+    """
+
+    :param search_terms:
+    :return:
+    """
+    temp_rule = [x for x in search_terms if "file_name=" in x]
+    rule_path = get_rules_dir()
+    if temp_rule:
+        file_name = temp_rule[0].replace("file_name=", "")
+        temp_name = os.path.join(rule_path, file_name)
+        rules = [x for x in search_terms if x != temp_rule[0]]
+        if os.path.exists(temp_name):
+            with open(str(temp_name), "a+") as f_h:
+                f_h.write(json.dumps(rules))
+                f_h.write("\n")
+        else:
+            with open(temp_name, "w") as f_h:
+                f_h.write(json.dump(rules))
+                f_h.write("\n")
+    else:
+        print "ERROR: Must supply argument with file name `file_name=FOO.rule`"
 
 
 def hotkey_rule():
-	ea = here()
-	skeleton = generate_skeleton(ea)
-	function_addr = "0x%x" % (get_func_addr(ea)[1])
-	context = "context=%s, %s" % (idc.get_idb_path(), function_addr)
-	skeleton.append(context)
-	rule_path = get_rules_dir()
-	temp_name = str(datetime.datetime.now().strftime("%Y-%m-%d")) + ".rule" 
-	file_path = os.path.join(rule_path, temp_name)
-	if os.path.exists(file_path):
-		with open(str(file_path), "a+") as f_h:
-			f_h.write(json.dumps(skeleton))
-			f_h.write("\n")
-	else:
-		with open(file_path, "w") as f_h:
-			f_h.write(json.dumps(skeleton))
-			f_h.write("\n")
+    """
+
+    :return:
+    """
+    ea = here()
+    skeleton = generate_skeleton(ea)
+    function_addr = "0x%x" % (get_func_addr(ea)[1])
+    context = "context=%s, %s" % (idc.get_idb_path(), function_addr)
+    skeleton.append(context)
+    rule_path = get_rules_dir()
+    temp_name = str(datetime.datetime.now().strftime("%Y-%m-%d")) + ".rule"
+    file_path = os.path.join(rule_path, temp_name)
+    if os.path.exists(file_path):
+        with open(str(file_path), "a+") as f_h:
+            f_h.write(json.dumps(skeleton))
+            f_h.write("\n")
+    else:
+        with open(file_path, "w") as f_h:
+            f_h.write(json.dumps(skeleton))
+            f_h.write("\n")
 
 
 def get_rules_dir():
-	if RULES_DIR:
-		return RULES_DIR
-	else:
-		return os.path.join(os.path.dirname(inspect.getfile(inspect.currentframe())), "rules")
+    """
+
+    :return:
+    """
+    if RULES_DIR:
+        return RULES_DIR
+    else:
+        return os.path.join(os.path.dirname(inspect.getfile(inspect.currentframe())), "rules")
 
 
 def run_rules():
-	# TODO Need to figure out how to store the rules
+    """
+
+    :return:
+    """
     rule_path = get_rules_dir()
-    print rule_path
-    paths = glob.glob(rule_path + "\*") 
+    paths = glob.glob(rule_path + "\*")
     for path in paths:
-    	if os.path.isdir(path):
-    		continue 
-        print "RULE: %s" % path
+        if os.path.isdir(path):
+            continue
+        print "RULE(s): %s" % path
         with open(path, "r") as rule:
             for line_search in rule.readlines():
                 try:
-                    rule = json.loads(line_search)
-                    search(rule)
-                except:
-                    print "ERROR: Review file %s rule %s" % (path,line_search.rstrip() )
+                    # convert unicode to ascii
+                    rule = byteify(json.loads(line_search))
+                    print "\tSEARCH: %s" % rule
+                    status, match = search(*rule)
+                    if status:
+                        for m in match:
+                            print "\tMatch at 0x%x" % m
+                except Exception as e:
+                    print "ERROR: Review file %s rule %s, %s" % (path, line_search.rstrip(), e)
+
 
 def run_rule(rule_name):
-	rule_path = get_rules_dir()
+    """
 
+    :param rule_name:
+    :return:
+    """
+    rule_dir = get_rules_dir()
+    rule_path = os.path.join(rule_dir, rule_name)
+    if os.path.isfile(rule_path):
+        print "RULE(s): %s" % rule_path
+        with open(rule_path, "r") as rule:
+            for line_search in rule.readlines():
+                try:
+                    # convert unicode to ascii
+                    rule = byteify(json.loads(line_search))
+                    print "\tSEARCH: %s" % rule
+                    status, match = search(*rule)
+                    if status:
+                        for m in match:
+                            print "\tMatch at 0x%x" % m
+                except Exception as e:
+                    print "ERROR: Review file %s rule %s, %s" % (path, line_search.rstrip(), e)
+
+    else:
+        print "ERROR: File %s could not be found"
 
 
 def format_search(*search_terms):
-	status, func_match = search(search_terms)
+    """
 
+    :param search_terms:
+    :return:
+    """
+    status, func_match = search(search_terms)
+
+
+def byteify(input):
+    # source https://stackoverflow.com/a/13105359
+    if isinstance(input, dict):
+        return {byteify(key): byteify(value)
+                for key, value in input.iteritems()}
+    elif isinstance(input, list):
+        return [byteify(element) for element in input]
+    elif isinstance(input, unicode):
+        return input.encode('utf-8')
+    else:
+        return input
