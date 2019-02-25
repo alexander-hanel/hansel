@@ -1,12 +1,8 @@
 """
 hex-bytes, strings, api-name, integer values
 TODO
- - function rename 
- - add comments 
  - yara rule error handling 
- - load search
  - create report 
- - contex field?
 
 search attributes "file_name=", "comment=", "rename=", "name="
 """
@@ -136,9 +132,9 @@ class YaraIDASearch:
 
 def is_lib(ea):
     """
-
-    :param ea:
-    :return:
+    is function a library 
+    :param ea: 
+    :return: if lib return True else return False
     """
     flags = idc.get_func_attr(ea, FUNCATTR_FLAGS)
     if flags & FUNC_LIB:
@@ -149,9 +145,9 @@ def is_lib(ea):
 
 def get_func_symbols(ea):
     """
-
-    :param ea:
-    :return:
+    get all symbol/api calls from a function  
+    :param ea: offset within a function 
+    :return: return list of symbol/api 
     """
     offsets = []
     dism_addr = list(idautils.FuncItems(ea))
@@ -183,9 +179,9 @@ def get_func_symbols(ea):
 
 def get_func_str_hack(ea):
     """
-
-    :param ea:
-    :return:
+    get all referenced strings within a function, actually works 
+    :param ea: offset within a function 
+    :return: return list of strings referenced in function 
     """
     offsets = []
     status, ea_st = get_func_addr(ea)
@@ -204,9 +200,9 @@ def get_func_str_hack(ea):
 
 def get_func_strings(ea):
     """
-
-    :param ea:
-    :return:
+    get all referenced strings within a function, doesn't really work well 
+    :param ea: offset within a function 
+    :return: return list of strings referenced in a a function 
     """
     offsets = []
     dism_addr = list(idautils.FuncItems(ea))
@@ -227,9 +223,9 @@ def get_func_strings(ea):
 
 def get_func_values(ea):
     """
-
-    :param ea:
-    :return:
+    get all integer values within a function
+    :param ea: offset within a function 
+    :return: return list of integer values within a function 
     """
     offsets = []
     dism_addr = list(idautils.FuncItems(ea))
@@ -250,9 +246,9 @@ def get_func_values(ea):
 
 def generate_skeleton(ea):
     """
-
-    :param ea:
-    :return:
+    auto generate all attributes from a function that can be used for rule creation
+    :param ea: offset within a function 
+    :return: return auto generated rule (likely needs to be edited)
     """
     skeleton = set([])
     status, ea = get_func_addr(ea)
@@ -277,9 +273,9 @@ def get_xrefsto(ea):
 
 def get_func_addr(ea):
     """
-
-    :param ea:
-    :return:
+    get function offset start
+    :param ea: address
+    :return: returns offset of the start of the function 
     """
     tt = idaapi.get_func(ea)
     if tt:
@@ -289,9 +285,9 @@ def get_func_addr(ea):
 
 def get_func_addr_end(ea):
     """
-
-    :param ea:
-    :return:
+    get funtion offset end 
+    :param ea: address
+    :return: returns offset of the end of the function 
     """
     tt = idaapi.get_func(ea)
     if tt:
@@ -363,9 +359,9 @@ def search_string(query):
 def search_value(value_list, dict_match):
     """
     search if value exists in function returns str of list
-    :param value_list:
+    :param value_list: list of values to search for 
     :param dict_match:
-    :return:
+    :return: (Status, Matches)
     """
     func_addr = []
     if dict_match:
@@ -390,14 +386,15 @@ def search_value(value_list, dict_match):
     return False, None
 
 
+# TODO - add logic for loading yara memory
 yara_search = YaraIDASearch()
 
 
 def search(*search_terms):
     """
 
-    :param search_terms:
-    :return:
+    :param search_terms: tuple of strings, integers, API/Symbols, etc to search for 
+    :return: tuple(Status, List) Status could be True or False, List of function matches offset
     """
     dict_match = {}
     value_list = []
@@ -469,10 +466,10 @@ def search(*search_terms):
 
 def label_(func_match, temp_comment, temp_rename):
     """
-
-    :param func_match:
-    :param temp_comment:
-    :param temp_rename:
+    adds comment or renames function 
+    :param func_match: function offset 
+    :param temp_comment: string comment 
+    :param temp_rename: string function name 
     :return:
     """
     for match in func_match:
@@ -484,8 +481,8 @@ def label_(func_match, temp_comment, temp_rename):
 
 def name_func(ea, name):
     """
-
-    :param ea:
+    Rename a function, appends string if already renamed
+    :param ea: start offset to a function 
     :param name:
     :return:
     """
@@ -502,10 +499,10 @@ def name_func(ea, name):
 
 def comm_func(ea, comment):
     """
-
-    :param ea:
-    :param comment:
-    :return:
+    Add function comment 
+    :param ea: start offset to a function 
+    :param comment: string of comment to add 
+    :return: None 
     """
     temp = idc.get_func_cmt(ea, True)
     if comment in temp:
@@ -519,9 +516,9 @@ def comm_func(ea, comment):
 
 def save_search(*search_terms):
     """
-
-    :param search_terms:
-    :return:
+    save search to a file (specified with `file_name=FILENAME`)
+    :param search_terms: search string. 
+    :return: None 
     """
     temp_rule = [x for x in search_terms if "file_name=" in x]
     rule_path = get_rules_dir()
@@ -543,7 +540,8 @@ def save_search(*search_terms):
 
 def hotkey_rule():
     """
-
+    TODO : add IDA Hotkey 
+    create rule using date as file name using the current function as the input for the skelton rule 
     :return:
     """
     ea = here()
@@ -566,8 +564,8 @@ def hotkey_rule():
 
 def get_rules_dir():
     """
-
-    :return:
+    helper function that gets the rule directory 
+    :return: string of the path to the rule directory 
     """
     if RULES_DIR:
         return RULES_DIR
@@ -577,8 +575,8 @@ def get_rules_dir():
 
 def run_rules():
     """
-
-    :return:
+    run search using all rules in the rule directory 
+    :return: None 
     """
     rule_path = get_rules_dir()
     paths = glob.glob(rule_path + "\*")
@@ -602,9 +600,9 @@ def run_rules():
 
 def run_rule(rule_name):
     """
-
-    :param rule_name:
-    :return:
+    search using a single file
+    :param rule_name: string file name to save rule to 
+    :return: None 
     """
     rule_dir = get_rules_dir()
     rule_path = os.path.join(rule_dir, rule_name)
@@ -629,7 +627,7 @@ def run_rule(rule_name):
 
 def format_search(*search_terms):
     """
-
+    TODO 
     :param search_terms:
     :return:
     """
