@@ -408,10 +408,10 @@ def search(*search_terms):
     context = False
     file_name = False
     # TODO - check that type is string and not int
-    temp_comment = [x for x in search_terms if "comment=" in x]
-    temp_rename = [x for x in search_terms if "rename=" in x]
-    temp_context = [x for x in search_terms if "context=" in x]
-    temp_file = [x for x in search_terms if "file_name=" in x]
+    temp_comment = [x for x in search_terms if "comment=" in str(x)]
+    temp_rename = [x for x in search_terms if "rename=" in str(x)]
+    temp_context = [x for x in search_terms if "context=" in str(x)]
+    temp_file = [x for x in search_terms if "file_name=" in str(x)]
     if temp_comment:
         search_terms = [x for x in search_terms if x != temp_comment[0]]
         temp_comment = temp_comment[0].replace("comment=", "")
