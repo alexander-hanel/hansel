@@ -18,6 +18,10 @@ import os
 import sys
 import json
 
+DEBUG = True
+if DEBUG:
+    import traceback 
+
 SEARCH_CASE = 4
 SEARCH_REGEX = 8
 SEARCH_NOBRK = 16
@@ -439,6 +443,10 @@ def search(*search_terms):
                                 dict_match[term] = [offset]
                             else:
                                 dict_match[term].append(offset)
+                        # single yara byte pattern search 
+                        if len(search_terms) == 1 and yara_results and status == False:
+                            label_binary(yara_results, temp_comment)
+                            return True, yara_results
 
             else:
                 # start string search 
@@ -465,7 +473,7 @@ def search(*search_terms):
         if len(dict_match.keys()) == len(search_terms):
             func_list = [set(dict_match[key]) for key in dict_match.keys()]
             if len(search_terms) == 1:
-                label_(func_match, temp_comment, temp_rename)
+                label_(func_list[0], temp_comment, temp_rename)
                 return True, func_list[0]
             func_match = set.intersection(*func_list)
             label_(func_match, temp_comment, temp_rename)
@@ -522,6 +530,15 @@ def comm_func(ea, comment):
     else:
         idc.set_func_cmt(ea, comment, True)
 
+def label_binary(yara_match, comment):
+    for ea in yara_match:
+        temp = idc.get_cmt(ea, True)
+        if temp:
+            tt = temp + " " + comment 
+            idc.set_cmt(ea, tt, True)
+        else:
+            idc.set_cmt(ea, comment, True)
+
 
 def save_search(*search_terms):
     """
@@ -529,7 +546,7 @@ def save_search(*search_terms):
     :param search_terms: search string. 
     :return: None 
     """
-    temp_rule = [x for x in search_terms if "file_name=" in x]
+    temp_rule = [x for x in search_terms if "file_name=" in str(x)]
     rule_path = get_rules_dir()
     if temp_rule:
         file_name = temp_rule[0].replace("file_name=", "")
@@ -629,6 +646,8 @@ def run_rule(rule_name):
                             print "\tMatch at 0x%x" % m
                 except Exception as e:
                     print "ERROR: Review file %s rule %s, %s" % (rule_path, line_search.rstrip(), e)
+                    if DEBUG:
+                        print traceback.format_exc()
 
     else:
         print "ERROR: File %s could not be found"
