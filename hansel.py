@@ -1,13 +1,12 @@
 """
-hex-bytes, strings, api-name, integer values
-TODO
- - yara rule error handling 
- - create report 
+author: alexander hanel
+version: 1.0
+date: 2019-03-03 
 
-search attributes "file_name=", "comment=", "rename=", "name="
 """
 
 import idautils
+import idaapi 
 import datetime
 import glob
 import yara
@@ -18,9 +17,10 @@ import os
 import sys
 import json
 
-DEBUG = True
+DEBUG = False
 if DEBUG:
     import traceback 
+INIT = False
 
 SEARCH_CASE = 4
 SEARCH_REGEX = 8
@@ -285,9 +285,10 @@ def get_func_addr(ea):
     :param ea: address
     :return: returns offset of the start of the function 
     """
-    tt = idaapi.get_func(ea)
-    if tt:
-        return True, tt.startEA
+    if ea:
+        tt = idaapi.get_func(ea)
+        if tt:
+            return True, tt.startEA
     return False, None
 
 
@@ -394,10 +395,6 @@ def search_value(value_list, dict_match):
     return False, None
 
 
-# TODO - add logic for loading yara memory
-yara_search = YaraIDASearch()
-
-
 def search(*search_terms):
     """
 
@@ -444,7 +441,7 @@ def search(*search_terms):
                             else:
                                 dict_match[term].append(offset)
                         # single yara byte pattern search 
-                        if len(search_terms) == 1 and yara_results and status == False:
+                        if len(search_terms) == 1 and yara_results[0] and status == False:
                             label_binary(yara_results, temp_comment)
                             return True, yara_results
 
@@ -461,13 +458,17 @@ def search(*search_terms):
                                 dict_match[term] = [offset]
                             else:
                                 dict_match[term].append(offset)
-        elif isinstance(term, int):
+        elif isinstance(term, int) or isinstance(term, long) :
             value_list.append(term)
     # start integer search 
     if value_list:
+        if DEBUG:
+            print "value_list %s" % value_list
         status, temp_match = search_value(value_list, dict_match)
         if status:
             dict_match = temp_match
+    if DEBUG:
+        print dict_match
     # cross-reference matches to a single function 
     if dict_match:
         if len(dict_match.keys()) == len(search_terms):
@@ -476,8 +477,9 @@ def search(*search_terms):
                 label_(func_list[0], temp_comment, temp_rename)
                 return True, func_list[0]
             func_match = set.intersection(*func_list)
-            label_(func_match, temp_comment, temp_rename)
-            return True, func_match
+            if func_match:
+                label_(func_match, temp_comment, temp_rename)
+                return True, func_match
     return False, None
 
 
@@ -502,6 +504,7 @@ def name_func(ea, name):
     :param ea: start offset to a function 
     :param name:
     :return:
+    TODO check warnings and increment if name is present 
     """
     f = idc.get_full_flags(ea)
     if not idc.hasUserName(f):
@@ -530,14 +533,18 @@ def comm_func(ea, comment):
     else:
         idc.set_func_cmt(ea, comment, True)
 
+
 def label_binary(yara_match, comment):
-    for ea in yara_match:
-        temp = idc.get_cmt(ea, True)
-        if temp:
-            tt = temp + " " + comment 
-            idc.set_cmt(ea, tt, True)
-        else:
-            idc.set_cmt(ea, comment, True)
+    if comment:
+        for ea in yara_match:
+            temp = idc.get_cmt(ea, True)
+            if temp:
+                if comment in temp:
+                    continue 
+                tt = temp + " " + comment 
+                idc.set_cmt(ea, tt, True)
+            else:
+                idc.set_cmt(ea, comment, True)
 
 
 def save_search(*search_terms):
@@ -562,6 +569,13 @@ def save_search(*search_terms):
                 f_h.write("\n")
     else:
         print "ERROR: Must supply argument with file name `file_name=FOO.rule`"
+
+
+def add_hotkey():
+    """
+    enable hotkey of ALT-/
+    """
+    ida_kernwin.add_hotkey("Alt-/", hotkey_rule)
 
 
 def hotkey_rule():
@@ -653,13 +667,15 @@ def run_rule(rule_name):
         print "ERROR: File %s could not be found"
 
 
-def format_search(*search_terms):
-    """
-    TODO 
-    :param search_terms:
-    :return:
-    """
-    status, func_match = search(search_terms)
+def cheat_sheet():
+    print """
+    search("query1", "query2", "comment=My_Comment", "rename=FUNCTION_NAME")
+    save_search( "query1","file_name=RULE_NAME.rule", "comment=My_Comment", "rename=FUNCTION_NAME")
+    run_rule("RULES_NAME.rule")
+    run_rules() <- no arguments
+    hot_key() <- saves output of generate_skelton(ea) to rules directory with the date as the name   
+    added by hot_key() "context=XYZ.idb"
+     """
 
 
 def byteify(input):
@@ -673,3 +689,10 @@ def byteify(input):
         return input.encode('utf-8')
     else:
         return input
+
+
+if not INIT:
+    yara_search = YaraIDASearch()
+    add_hotkey()
+    INIT = True 
+
