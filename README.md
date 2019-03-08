@@ -7,22 +7,22 @@ Bytes, strings, symbols and values from enumerated types are sometimes all that 
 Python>search("CreateToolhelp32Snapshot", 0xFFFFFFFF, "TerminateProcess", )
 (True, set([4249808L]))
 ```
-To rename the function that matches the search add `”rename=NewFunctionName”`. To add a function comment that matches the search add `"comment=My Comment"`. Please note that these commands are within strings. The following snippet is the previous search with function comment and labeling added.
+To rename the function that matches the search add `”rename=NewFunctionName”`. To add a function comment that matches the search add `comment="My Comment"`. The following snippet is the previous search with function comment and labeling added. 
 ```python
-search("CreateToolhelp32Snapshot", 0xFFFFFFFF, "TerminateProcess", "rename=kill_process", "comment=kill process" )
+search("CreateToolhelp32Snapshot", 0xFFFFFFFF, "TerminateProcess", rename="kill_process", comment="kill process" )
 ```
 
-Searches can be saved to a rules file by calling `save_search()`. This function must contain `“file_name=FILE.rule”`. The following snippet is the working example saved to a file named ` kill_process.rule`. 
+Searches can be saved to a rules file by calling `save_search()`. This function must contain `filename="FILE.rule”`. The following snippet is the working example saved to a file named `kill_process.rule`. 
 ```python 
-save_search("CreateToolhelp32Snapshot", 0xFFFFFFFF, "TerminateProcess", "file_name=kill_process.rule", "rename=kill_process", "comment=kill process" ) 
+save_search("CreateToolhelp32Snapshot", 0xFFFFFFFF, "TerminateProcess", filename="kill_process.rule", rename="kill_process", comment="kill process") 
 ```
 To search using rules saved in a file the function `run_rule(rule_name)` is used. 
 
 ```python 
 Python>run_rule("kill_process.rule")
-RULE(s): C:/Users/REMOVED/Documents/repo/hansel\rules\kill_process.rule
-	SEARCH: ['CreateToolhelp32Snapshot', 4294967295L, 'TerminateProcess', 'rename=kill_process', 'comment=kill process']
-	Match at 0x40d8d0
+RULE(s): C:/Users/this/Documents/repo/hansel\rules\kill_process.rule
+	SEARCH: ['CreateToolhelp32Snapshot', 4294967295L, 'TerminateProcess']
+	Match at 0x40e8a0
 ```
 To run all rules the function `run_rules()` can be used. Attributes can be extracted from a function by calling `generate_skeleton(ea)`. 
 
@@ -32,7 +32,7 @@ Python>generate_skeleton(here())
 ```
 To quickly save attributes from a function and revisit them at a later date, the hotkey `ALT-/` can be used. The rules are saved in the rules directory within the working directory of the Hansel repo. The rule file name is the current date `YEAR-MONTH-DAY.rule` (example: ` 2019-03-03.rule`). The search contains a field name `context` that has the IDB path and function offset.  The following is an example of a rule file. 
 ```
-["CreateToolhelp32Snapshot", 0, 2, 1, 556, "lstrlenW", "Process32NextW", "OpenProcess", "CharUpperBuffW", "Process32FirstW", 1600, "lstrcpyW", 4294965704, 4294965696, "CloseHandle", "TerminateProcess", "lstrcmpW", 4294965732, 4294966252, 4294966772, 4294967292, 4294967295, "context=C:\\Users\\REMOVED\\Desktop\\EXAMPLE\\foo.idb, 0x40d8d0"]
+{"search_terms": ["CreateToolhelp32Snapshot", 0, 2, 1, 556, "lstrlenW", "Process32NextW", "OpenProcess", "CharUpperBuffW", "Process32FirstW", 1600, "lstrcpyW", 4294965704, 4294965696, "CloseHandle", "TerminateProcess", "lstrcmpW", 4294965732, 4294966252, 4294966772, 4294967292, 4294967295], "kwargs": {"context": "C:\\Users\\REMOVED\\Desktop\\foo.idb, 0x40e8a0"}}
 ```
 
 The function `cheat_sheet()` can used to retrieve all the needed APIS and their keywords. 
@@ -40,8 +40,8 @@ The function `cheat_sheet()` can used to retrieve all the needed APIS and their 
 ```python  
 Python>cheat_sheet()
 
-    search("query1", "query2", "comment=My_Comment", "rename=FUNCTION_NAME")
-    save_search( "query1","file_name=RULE_NAME.rule", "comment=My_Comment", "rename=FUNCTION_NAME")
+    search("query1", "query2", comment="My_Comment", rename="FUNCTION_NAME")
+    save_search( "query1", file_name="RULE_NAME.rule", comment="My_Comment", rename="FUNCTION_NAME")
     run_rule("RULES_NAME.rule")
     run_rules() <- no arguments
     hot_key() <- saves output of generate_skelton(ea) to rules directory with the date as the name   
@@ -60,7 +60,16 @@ Python>search("{7F 7F 7F 7F 7F 7F 7F 7F  40 56 41 00 84 62 41 00 }")
 ```
 
 ## Status
-- Stablish. I’m still testing all the possible combinations of searches and keywords.  
+- Stablish.
+- I’m still testing all the possible combinations of searches and keywords.  
 - Daily usage so bugs will be fixed. 
   
+## Version Changes
 
+### 2.0 
+ - removed storing the `rename`, `comment`, `filename` and similar within strings. I didn't reliaze I could use `**kwargs` to store multiple named arguments.  
+ - renamed `file_name` to `filename`. 
+ - converted the rules to a dict json format. It kind of sucks not being able to cut and paste from the command line to the rules file but it didn't work with the named arguments. 
+ - only displays matches, not rules being scanned 
+ - I'll start uploading rules once this rule set format seems to be working well. 
+ - Thanks to OA for the feedback. 

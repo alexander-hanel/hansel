@@ -1,6 +1,6 @@
 """
 author: alexander hanel
-version: 1.0
+version: 2.0
 date: 2019-03-03 
 
 """
@@ -395,7 +395,7 @@ def search_value(value_list, dict_match):
     return False, None
 
 
-def search(*search_terms):
+def search(*search_terms, **kwargs):
     """
 
     :param search_terms: tuple of strings, integers, API/Symbols, etc to search for 
@@ -403,26 +403,20 @@ def search(*search_terms):
     """
     dict_match = {}
     value_list = []
-    # remove non-search attributes for renaming or commenting matches
-    comment = False
-    rename_func = False
-    context = False
-    file_name = False
-    # TODO - check that type is string and not int
-    temp_comment = [x for x in search_terms if "comment=" in str(x)]
-    temp_rename = [x for x in search_terms if "rename=" in str(x)]
-    temp_context = [x for x in search_terms if "context=" in str(x)]
-    temp_file = [x for x in search_terms if "file_name=" in str(x)]
-    if temp_comment:
-        search_terms = [x for x in search_terms if x != temp_comment[0]]
-        temp_comment = temp_comment[0].replace("comment=", "")
-    if temp_rename:
-        search_terms = [x for x in search_terms if x != temp_rename[0]]
-        temp_rename = temp_rename[0].replace("rename=", "")
-    if temp_context:
-        search_terms = [x for x in search_terms if x != temp_context[0]]
-    if temp_file:
-        search_terms = [x for x in search_terms if x != temp_file[0]]
+    temp_comment = False
+    temp_context = False
+    temp_rename = False
+    temp_file = False
+    if "comment" in kwargs.keys():
+        temp_comment = kwargs["comment"]
+    if "rename" in kwargs.keys():
+        temp_rename = kwargs["rename"]
+    if temp_rename == False and "context" in kwargs.keys():
+        temp_comment =  kwargs["context"]
+    if "context" in kwargs.keys():
+        temp_context = kwargs["context"]
+    if "filename" in kwargs.keys():
+        temp_file = kwargs["filename"]
     # start search 
     status = False
     for term in search_terms:
@@ -547,28 +541,33 @@ def label_binary(yara_match, comment):
                 idc.set_cmt(ea, comment, True)
 
 
-def save_search(*search_terms):
+def save_search(*search_terms, **kwargs):
     """
     save search to a file (specified with `file_name=FILENAME`)
     :param search_terms: search string. 
     :return: None 
     """
-    temp_rule = [x for x in search_terms if "file_name=" in str(x)]
+    temp_rule = ""
+    if "filename" in kwargs.keys():
+        temp_rule = kwargs["filename"]
+        kwargs.pop("filename", None)
+    save = {}
+    save["search_terms"] = search_terms
+    save["kwargs"] = kwargs
     rule_path = get_rules_dir()
     if temp_rule:
-        file_name = temp_rule[0].replace("file_name=", "")
+        file_name = temp_rule
         temp_name = os.path.join(rule_path, file_name)
-        rules = [x for x in search_terms if x != temp_rule[0]]
         if os.path.exists(temp_name):
             with open(str(temp_name), "a+") as f_h:
-                f_h.write(json.dumps(rules))
+                f_h.write(json.dumps(save))
                 f_h.write("\n")
         else:
             with open(temp_name, "w") as f_h:
-                f_h.write(json.dumps(rules))
+                f_h.write(json.dumps(save))
                 f_h.write("\n")
     else:
-        print "ERROR: Must supply argument with file name `file_name=FOO.rule`"
+        print 'ERROR: Must supply argument with file name filename="FOO.rule"'
 
 
 def add_hotkey():
@@ -580,25 +579,29 @@ def add_hotkey():
 
 def hotkey_rule():
     """
-    TODO : add IDA Hotkey 
     create rule using date as file name using the current function as the input for the skelton rule 
     :return:
     """
+    # get skelton 
     ea = here()
     skeleton = generate_skeleton(ea)
+    save = {} 
+    save["search_terms"] = skeleton
+    # get context 
     function_addr = "0x%x" % (get_func_addr(ea)[1])
-    context = "context=%s, %s" % (idc.get_idb_path(), function_addr)
-    skeleton.append(context)
+    context = "%s, %s" % (idc.get_idb_path(), function_addr)
+    save["kwargs"] = {"context" : context}
+    # get path and create file name
     rule_path = get_rules_dir()
     temp_name = str(datetime.datetime.now().strftime("%Y-%m-%d")) + ".rule"
     file_path = os.path.join(rule_path, temp_name)
     if os.path.exists(file_path):
         with open(str(file_path), "a+") as f_h:
-            f_h.write(json.dumps(skeleton))
+            f_h.write(json.dumps(save))
             f_h.write("\n")
     else:
         with open(file_path, "w") as f_h:
-            f_h.write(json.dumps(skeleton))
+            f_h.write(json.dumps(save))
             f_h.write("\n")
 
 
@@ -623,16 +626,18 @@ def run_rules():
     for path in paths:
         if os.path.isdir(path):
             continue
-        print "RULE(s): %s" % path
         with open(path, "r") as rule:
             for line_search in rule.readlines():
                 try:
                     # convert unicode to ascii
-                    rule = byteify(json.loads(line_search))
-                    print "\tSEARCH: %s" % rule
-                    status, match = search(*rule)
+                    saved_rule = byteify(json.loads(line_search))
+                    rule = saved_rule["search_terms"]
+                    kwarg = saved_rule["kwargs"]
+                    status, match = search(*rule,**kwarg)
                     if status:
                         for m in match:
+                            print "RULE(s): %s" % rule_path
+                            print "\tSEARCH: %s" % rule
                             print "\tMatch at 0x%x" % m
                 except Exception as e:
                     print "ERROR: Review file %s rule %s, %s" % (path, line_search.rstrip(), e)
@@ -647,16 +652,18 @@ def run_rule(rule_name):
     rule_dir = get_rules_dir()
     rule_path = os.path.join(rule_dir, rule_name)
     if os.path.isfile(rule_path):
-        print "RULE(s): %s" % rule_path
         with open(rule_path, "r") as rule:
             for line_search in rule.readlines():
                 try:
                     # convert unicode to ascii
-                    rule = byteify(json.loads(line_search))
-                    print "\tSEARCH: %s" % rule
-                    status, match = search(*rule)
+                    saved_rule = byteify(json.loads(line_search))
+                    rule = saved_rule["search_terms"]
+                    kwarg = saved_rule["kwargs"]
+                    status, match = search(*rule,**kwarg)
                     if status:
                         for m in match:
+                            print "RULE(s): %s" % rule_path
+                            print "\tSEARCH: %s" % rule
                             print "\tMatch at 0x%x" % m
                 except Exception as e:
                     print "ERROR: Review file %s rule %s, %s" % (rule_path, line_search.rstrip(), e)
@@ -669,12 +676,12 @@ def run_rule(rule_name):
 
 def cheat_sheet():
     print """
-    search("query1", "query2", "comment=My_Comment", "rename=FUNCTION_NAME")
-    save_search( "query1","file_name=RULE_NAME.rule", "comment=My_Comment", "rename=FUNCTION_NAME")
+    search("query1", "query2", comment="My_Comment", rename="FUNCTION_NAME")
+    save_search( "query1",file_name="RULE_NAME.rule", comment="My_Comment", rename="FUNCTION_NAME")
     run_rule("RULES_NAME.rule")
     run_rules() <- no arguments
     hot_key() <- saves output of generate_skelton(ea) to rules directory with the date as the name   
-    added by hot_key() "context=XYZ.idb"
+    added by hot_key() context="XYZ.idb, 0x40000 = func offset"
      """
 
 
