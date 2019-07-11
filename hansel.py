@@ -1,7 +1,7 @@
 """
 author: alexander hanel
-version: 2.0
-date: 2019-03-03 
+version: 2.2
+date: 2019-07-11 
 
 """
 
@@ -636,7 +636,6 @@ def run_rules():
                     saved_rule = byteify(json.loads(line_search))
                     rule = saved_rule["search_terms"]
                     kwarg = saved_rule["kwargs"]
-                    print saved_rule.keys()
                     status, match = search(*rule,**kwarg)
                     if status:
                         for m in match:
