@@ -262,6 +262,8 @@ def generate_skeleton(ea):
             skeleton.add("%s" % x[1])
         for x in get_func_str_hack(ea):
             skeleton.add("%s" % x[1])
+        for x in get_func_strings(ea):
+            skeleton.add("%s" % x[1])
         for x in get_func_values(ea):
             skeleton.add(int(x[1]))
     return list(skeleton)
@@ -505,7 +507,8 @@ def name_func(ea, name):
         idc.set_name(ea, name, SN_CHECK)
     else:
         temp = idc.get_name(ea)
-        if name in temp:
+        # do not rename WinMain 
+        if name in temp or "winmain" in temp.lower():
             return
         temp_name = temp + "_" + name
         idc.set_name(ea, temp_name, SN_CHECK)
@@ -633,6 +636,7 @@ def run_rules():
                     saved_rule = byteify(json.loads(line_search))
                     rule = saved_rule["search_terms"]
                     kwarg = saved_rule["kwargs"]
+                    print saved_rule.keys()
                     status, match = search(*rule,**kwarg)
                     if status:
                         for m in match:
